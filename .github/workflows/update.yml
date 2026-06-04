@@ -1,79 +1,67 @@
 name: Update Proxies
 
 env:
-FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
-workflow_dispatch:
-
-schedule:
-- cron: '*/30 * * * *'
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'
 
 permissions:
-contents: write
+  contents: write
 
 jobs:
-update:
-runs-on: ubuntu-latest
+  update:
+    runs-on: ubuntu-latest
 
-```
-steps:
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  - name: Checkout
-    uses: actions/checkout@v4
+      - name: Download proxies
+        run: |
+          echo "开始下载..."
+          curl \
+            -L \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+            --connect-timeout 30 \
+            --max-time 120 \
+            https://www.mtproto.shop/proxies.json \
+            -o proxies.json
+          echo "下载完成"
 
-  - name: Download proxies
-    run: |
-      echo "开始下载..."
+      - name: Check file
+        run: |
+          ls -lh
+          echo "文件大小:"
+          wc -c proxies.json
+          echo "文件前200字符:"
+          head -c 200 proxies.json
 
-      curl \
-        -L \
-        -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
-        --connect-timeout 30 \
-        --max-time 120 \
-        https://www.mtproto.shop/proxies.json \
-        -o proxies.json
+      - name: Validate JSON
+        run: |
+          python3 - <<EOF
+          import json
+          with open("proxies.json","r",encoding="utf-8") as f:
+              json.load(f)
+          print("JSON 验证成功")
+          EOF
 
-      echo "下载完成"
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-  - name: Check file
-    run: |
-      ls -lh
+      - name: Commit
+        run: |
+          git add proxies.json
+          if git diff --cached --quiet; then
+            echo "没有数据变化"
+            exit 0
+          fi
+          git commit -m "auto update proxies"
 
-      echo "文件大小:"
-      wc -c proxies.json
-
-      echo "文件前200字符:"
-      head -c 200 proxies.json
-
-  - name: Validate JSON
-    run: |
-      python3 - <<EOF
-      import json
-
-      with open("proxies.json","r",encoding="utf-8") as f:
-          json.load(f)
-
-      print("JSON 验证成功")
-      EOF
-
-  - name: Configure Git
-    run: |
-      git config user.name "github-actions[bot]"
-      git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-  - name: Commit
-    run: |
-      git add proxies.json
-
-      if git diff --cached --quiet; then
-        echo "没有数据变化"
-        exit 0
-      fi
-
-      git commit -m "auto update proxies"
-
-  - name: Push
-    run: |
-      git push origin HEAD:main
-```
+      - name: Push
+        run: |
+          git push origin HEAD:main
