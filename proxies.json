@@ -1,0 +1,12 @@
+{
+  "updated_at": "2026-06-04T00:00:00Z",
+  "proxies": [
+    {
+      "location": "Singapore",
+      "server": "1.1.1.1",
+      "port": 443,
+      "secret": "abcdef123456",
+      "status": "online"
+    }
+  ]
+}

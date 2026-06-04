@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MTProto Proxy Panel</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-50">
+<div class="max-w-5xl mx-auto p-6">
+<h1 class="text-3xl font-bold mb-4">MTProto Proxy Panel</h1>
+<button onclick="loadData()" class="px-4 py-2 bg-sky-500 text-white rounded">刷新</button>
+<div id="list" class="grid gap-4 mt-6"></div>
+</div>
+<script>
+async function loadData(){
+ const res = await fetch('./proxies.json?t='+Date.now());
+ const data = await res.json();
+ const proxies = Array.isArray(data)?data:(data.proxies||[]);
+ const list=document.getElementById('list');
+ list.innerHTML='';
+ proxies.forEach(p=>{
+   const host=p.domain||p.server;
+   const link=`tg://proxy?server=${host}&port=${p.port}&secret=${p.secret}`;
+   list.innerHTML += `<div class="bg-white p-4 rounded shadow">
+   <b>${p.location||'Unknown'}</b><br>
+   ${host}:${p.port}<br>
+   <a href="${link}" class="text-sky-600">连接 Telegram</a>
+   </div>`;
+ });
+}
+loadData();
+</script>
+</body>
+</html>
