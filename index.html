@@ -2,34 +2,101 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MTProto Proxy Panel</title>
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+.proxy-card:hover {transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1),0 4px 6px -4px rgba(0,0,0,0.1);}
+</style>
 </head>
-<body class="bg-slate-50">
-<div class="max-w-5xl mx-auto p-6">
-<h1 class="text-3xl font-bold mb-4">MTProto Proxy Panel</h1>
-<button onclick="loadData()" class="px-4 py-2 bg-sky-500 text-white rounded">刷新</button>
-<div id="list" class="grid gap-4 mt-6"></div>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+<div class="max-w-6xl mx-auto px-4 py-8">
+<header class="flex flex-col md:flex-row md:items-center md:justify-between pb-6 mb-8 border-b border-slate-200">
+<h1 class="text-3xl font-bold text-slate-900 flex items-center gap-3">
+<i class="fa-brands fa-telegram text-sky-500 text-4xl"></i> MTProto Proxy Panel
+</h1>
+<p class="text-slate-500 mt-1">数据来自本地 proxies.json，支持搜索、筛选、二维码</p>
+</header>
+<div class="mb-6">
+<input type="text" id="searchInput" placeholder="搜索国家、节点名或IP..." class="w-full md:w-1/3 pl-3 py-2 border rounded mb-2">
+<div class="flex gap-2">
+<button data-filter="all" class="filter-btn bg-sky-50 text-sky-600 px-4 py-1.5 rounded">全部</button>
+<button data-filter="online" class="filter-btn px-4 py-1.5 rounded bg-gray-100">在线</button>
+<button data-filter="slow" class="filter-btn px-4 py-1.5 rounded bg-gray-100">高延迟</button>
+</div>
+</div>
+<div id="proxyGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+<div id="emptyState" class="hidden text-center py-20 bg-white rounded border border-dashed border-slate-200">
+<i class="fa-solid fa-box-open text-slate-300 text-5xl mb-3"></i>
+<p class="text-slate-400">未找到符合条件的代理节点</p>
+</div>
+<div id="qrModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50">
+<div class="bg-white p-6 rounded-2xl max-w-sm w-full mx-4 shadow-xl text-center relative">
+<button id="closeModal" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer text-xl">
+<i class="fa-solid fa-xmark"></i></button>
+<h3 id="qrTitle" class="font-bold text-lg mb-2"></h3>
+<div id="qrcode" class="flex justify-center p-4 bg-slate-50 rounded-xl mb-4"></div>
+<a id="qrLink" href="#" class="block w-full bg-sky-500 hover:bg-sky-600 text-white text-center py-2.5 rounded-lg">直接连接 Telegram</a>
+</div>
 </div>
 <script>
-async function loadData(){
- const res = await fetch('./proxies.json?t='+Date.now());
- const data = await res.json();
- const proxies = Array.isArray(data)?data:(data.proxies||[]);
- const list=document.getElementById('list');
- list.innerHTML='';
- proxies.forEach(p=>{
-   const host=p.domain||p.server;
-   const link=`tg://proxy?server=${host}&port=${p.port}&secret=${p.secret}`;
-   list.innerHTML += `<div class="bg-white p-4 rounded shadow">
-   <b>${p.location||'Unknown'}</b><br>
-   ${host}:${p.port}<br>
-   <a href="${link}" class="text-sky-600">连接 Telegram</a>
-   </div>`;
- });
+let allProxies=[]; let searchQuery=''; let currentFilter='all';
+const proxyGrid=document.getElementById('proxyGrid');
+const emptyState=document.getElementById('emptyState');
+const searchInput=document.getElementById('searchInput');
+const filterBtns=document.querySelectorAll('.filter-btn');
+const qrModal=document.getElementById('qrModal'); const qrcodeContainer=document.getElementById('qrcode');
+async function fetchProxies(){
+  try{
+    const res=await fetch('./proxies.json?t='+Date.now());
+    const data=await res.json();
+    allProxies=Array.isArray(data)?data:(data.proxies||[]);
+    renderList();
+  }catch(e){alert('加载 proxies.json 失败');console.error(e);}
 }
-loadData();
+function renderList(){
+  const filtered=allProxies.filter(item=>{
+    const matchesSearch=(item.location?.toLowerCase().includes(searchQuery)||item.server?.toLowerCase().includes(searchQuery)||(item.domain?.toLowerCase().includes(searchQuery)));
+    const matchesFilter=currentFilter==='all'||item.status===currentFilter;
+    return matchesSearch&&matchesFilter;
+  });
+  proxyGrid.innerHTML=''; if(filtered.length===0){proxyGrid.classList.add('hidden');emptyState.classList.remove('hidden');return;}
+  proxyGrid.classList.remove('hidden'); emptyState.classList.add('hidden');
+  const fragment=document.createDocumentFragment();
+  filtered.forEach(proxy=>{
+    const host=proxy.domain||proxy.server;
+    const deepLink=`tg://proxy?server=${host}&port=${proxy.port}&secret=${proxy.secret}`;
+    const card=document.createElement('div'); card.className='bg-white p-5 rounded-2xl border shadow-xs proxy-card';
+    card.innerHTML=`<div class="mb-4">
+      <div class="flex justify-between items-center mb-2">
+        <span>${proxy.flag||'🌐'} ${proxy.location}</span>
+        <span class="text-xs">${proxy.status||''}</span>
+      </div>
+      <div class="text-xs font-mono bg-gray-50 p-2 rounded">
+        服务器: ${host}<br>端口: ${proxy.port}<br>密钥: ${proxy.secret}
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <a href="${deepLink}" class="flex-1 bg-sky-500 hover:bg-sky-600 text-white text-center py-2 rounded">连接</a>
+      <button onclick="copyToClipboard('${deepLink}')" class="flex-1 bg-gray-100 hover:bg-gray-200 py-2 rounded">复制</button>
+      <button onclick="showQRCode('${deepLink}','${proxy.location}')" class="flex-1 bg-gray-100 hover:bg-gray-200 py-2 rounded">二维码</button>
+    </div>`;
+    fragment.appendChild(card);
+  });
+  proxyGrid.appendChild(fragment);
+}
+function copyToClipboard(text){navigator.clipboard.writeText(text).then(()=>{alert('已复制');});}
+function showQRCode(link,name){
+  qrcodeContainer.innerHTML=''; document.getElementById('qrTitle').innerText=name;
+  new QRCode(qrcodeContainer,{text:link,width:180,height:180,colorDark:"#0f172a",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.H});
+  qrModal.classList.remove('hidden'); document.getElementById('qrLink').href=link;
+}
+document.getElementById('closeModal').addEventListener('click',()=>{qrModal.classList.add('hidden');});
+qrModal.addEventListener('click',e=>{if(e.target===qrModal)qrModal.classList.add('hidden');});
+searchInput.addEventListener('input',e=>{searchQuery=e.target.value.toLowerCase().trim();renderList();});
+filterBtns.forEach(btn=>{btn.addEventListener('click',e=>{filterBtns.forEach(b=>b.classList.remove('bg-sky-50','text-sky-600'));btn.classList.add('bg-sky-50','text-sky-600');currentFilter=e.target.dataset.filter;renderList();});});
+fetchProxies();
 </script>
-</body>
-</html>
+</body></html>

@@ -1,10 +1,7 @@
-# MTProto Panel
+# MTProto Proxy Panel
 
-上传到 GitHub 后：
+部署步骤:
 
-1. Settings → Pages
-2. Deploy from a branch
-3. Branch: main
-4. Save
-
-等待几分钟即可访问。
+1. 创建仓库上传所有文件
+2. Settings → Pages → Deploy from branch → main → /(root) → Save
+3. 等待几分钟访问: https://你的用户名.github.io/仓库名/
